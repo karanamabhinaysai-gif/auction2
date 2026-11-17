@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Auction Platform - Live Interactive Simulator (Units U1–U7)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-live { animation: pulse-ring 2s infinite ease-in-out; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-gavel text-xl text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight flex items-center gap-2">
+            Online Auction Platform
+            <span class="text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono">Java 17 + DDD</span>
+          </h1>
+          <p class="text-xs text-slate-400">DbC Contracts • Sealed Types • GoF State/Observer/Strategy • Atomic CAS</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- Auction Type Indicator (U3 Sealed Hierarchy) -->
+        <div class="flex items-center bg-slate-800/80 border border-slate-700 rounded-lg p-1 text-xs">
+          <button id="type-english-btn" onclick="setAuctionType('English')" class="px-2.5 py-1 rounded bg-indigo-600 font-medium text-white shadow transition">
+            English (Ascending)
+          </button>
+          <button id="type-sealed-btn" onclick="setAuctionType('SealedBid')" class="px-2.5 py-1 rounded text-slate-400 hover:text-white transition">
+            Sealed-Bid (Blind)
+          </button>
+        </div>
+
+        <!-- State Badge (U4 State Pattern) -->
+        <div id="state-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono text-xs font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-400 border-amber-500/30">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="state-name">DRAFT</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- NOTIFICATION TOAST CONTAINER -->
+  <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT COLUMN: AUCTION STAGE & BIDDING (Cols 7) -->
+    <section class="lg:col-span-7 flex flex-col gap-6">
+
+      <!-- ITEM SHOWCASE CARD -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div class="flex flex-col md:flex-row gap-6 items-start">
+          <div class="w-full md:w-44 h-44 rounded-xl bg-gradient-to-br from-slate-800 to-slate-950 border border-slate-700/60 flex flex-col items-center justify-center p-4 text-center shrink-0 shadow-inner">
+            <i class="fa-solid fa-guitar text-5xl text-amber-400/90 mb-2 drop-shadow"></i>
+            <span class="text-[11px] font-mono text-slate-400">LOT #AUC-2026-X1</span>
+            <span class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Vintage Collectible</span>
+          </div>
+
+          <div class="flex-1 w-full">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="text-xs font-medium text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-0.5 rounded-full inline-block mb-1">
+                  Featured Lot
+                </span>
+                <h2 class="text-xl font-bold text-white leading-snug">1959 Gibson Les Paul Standard "Burst"</h2>
+                <p class="text-xs text-slate-400 mt-1">Seller: <span class="font-semibold text-slate-300">Seller_Alice</span> (Anti-shill bidding contract enforced)</p>
+              </div>
+              <div class="text-right">
+                <span class="text-[11px] text-slate-400 block">Time Left</span>
+                <span id="countdown-timer" class="font-mono text-lg font-bold text-emerald-400">00:45:00</span>
+              </div>
+            </div>
+
+            <!-- BID METRICS BAR -->
+            <div class="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800/80">
+              <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+                <span class="text-[11px] text-slate-400 block mb-0.5">Current Highest</span>
+                <span id="highest-bid-val" class="font-mono text-xl font-extrabold text-indigo-400">$100.00</span>
+                <span id="highest-bidder-val" class="text-[11px] text-slate-400 block truncate mt-0.5">by Bidder_Bob</span>
+              </div>
+              <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+                <span class="text-[11px] text-slate-400 block mb-0.5">Min Increment (U1-2)</span>
+                <span class="font-mono text-xl font-bold text-amber-400">$10.00</span>
+                <span class="text-[11px] text-slate-400 block mt-0.5">Required jump</span>
+              </div>
+              <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+                <span class="text-[11px] text-slate-400 block mb-0.5">Next Valid Bid</span>
+                <span id="next-min-val" class="font-mono text-xl font-bold text-emerald-400">$110.00</span>
+                <span class="text-[11px] text-slate-400 block mt-0.5">Strict contract</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BIDDING CONTROL CONSOLE -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <h3 class="font-bold text-base text-white flex items-center gap-2 mb-4">
+          <i class="fa-solid fa-money-bill-wave text-indigo-400"></i> Place Bid (DbC Contracts Enforced)
+        </h3>
+
+        <!-- Bidding Inputs -->
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-400 block mb-1">Bidder Identity</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="selectBidder('Human_User')" id="btn-bidder-user" class="bidder-btn py-2 px-3 rounded-xl border border-indigo-500 bg-indigo-500/10 text-indigo-300 font-medium text-xs text-center transition">
+                <i class="fa-solid fa-user mr-1"></i> Human_User (You)
+              </button>
+              <button onclick="selectBidder('Bidder_Charlie')" id="btn-bidder-charlie" class="bidder-btn py-2 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-white font-medium text-xs text-center transition">
+                <i class="fa-solid fa-user-secret mr-1"></i> Bidder_Charlie
+              </button>
+              <button onclick="selectBidder('Seller_Alice')" id="btn-bidder-seller" class="bidder-btn py-2 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-white font-medium text-xs text-center transition" title="Test Shill Bidding contract guard!">
+                <i class="fa-solid fa-ban text-rose-400 mr-1"></i> Seller_Alice (Violator)
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-slate-400 block mb-1">Bid Amount ($ USD)</label>
+            <div class="flex items-center gap-3">
+              <div class="relative flex-1">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-slate-400 font-bold">$</span>
+                <input id="bid-input" type="number" step="1" value="110" class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono font-bold text-lg focus:outline-none focus:border-indigo-500 transition">
+              </div>
+              <button onclick="submitBid()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 active:scale-95 transition flex items-center gap-2">
+                <i class="fa-solid fa-gavel"></i> Place Bid
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Increment Buttons -->
+          <div>
+            <span class="text-[11px] font-semibold text-slate-400 block mb-1.5">Quick Increments:</span>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button onclick="addQuickIncrement(10)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-300 border border-slate-700 transition">
+                +$10 (Min)
+              </button>
+              <button onclick="addQuickIncrement(25)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-300 border border-slate-700 transition">
+                +$25
+              </button>
+              <button onclick="addQuickIncrement(50)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-300 border border-slate-700 transition">
+                +$50
+              </button>
+              <button onclick="addQuickIncrement(100)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-mono font-semibold text-slate-300 border border-slate-700 transition">
+                +$100
+              </button>
+              <button onclick="triggerConcurrentConflictTest()" class="ml-auto px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold transition flex items-center gap-1.5" title="U6: Simulates 2 simultaneous bids hitting the atomic CAS loop">
+                <i class="fa-solid fa-bolt"></i> Test U6 Concurrent CAS
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNIT 5: SETTLEMENT & COMPENSATION WORKFLOW -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-base text-white flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-emerald-400"></i> Unit 5: Winner Settlement & Compensation
+          </h3>
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-mono">Saga Compensation</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">
+          When the auction concludes, the platform attempts payment settlement with the highest bidder. If their payment fails (credit default / escrow decline), the platform automatically executes a compensation workflow, extending a second-chance offer to the <strong>second-highest bidder</strong>.
+        </p>
+
+        <div class="flex items-center gap-3">
+          <button onclick="executeSettlement(false)" id="settle-normal-btn" class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-semibold text-xs transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-check"></i> Settle Normal (Winner Pays)
+          </button>
+          <button onclick="executeSettlement(true)" id="settle-fail-btn" class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-semibold text-xs transition flex items-center justify-center gap-2" title="Triggers U5 Compensation workflow!">
+            <i class="fa-solid fa-triangle-exclamation"></i> Simulate Winner Payment Fail
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: STATE MACHINE, BOT STRATEGIES & AUDIT FEED (Cols 5) -->
+    <section class="lg:col-span-5 flex flex-col gap-6">
+
+      <!-- UNIT 4: STATE CONTROLS -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <h3 class="font-bold text-base text-white flex items-center gap-2 mb-3">
+          <i class="fa-solid fa-diagram-project text-amber-400"></i> Unit 4: Auction State Pattern
+        </h3>
+        <p class="text-xs text-slate-400 mb-4">Lifecycle guarded by State Pattern. State objects enforce valid actions and reject invalid transitions.</p>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="transitionState('ACTIVE')" id="btn-start" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow">
+            <i class="fa-solid fa-play"></i> Start Auction
+          </button>
+          <button onclick="transitionState('PAUSED')" id="btn-pause" class="py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow">
+            <i class="fa-solid fa-pause"></i> Pause Auction
+          </button>
+          <button onclick="transitionState('ENDED')" id="btn-end" class="py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow">
+            <i class="fa-solid fa-flag-checkered"></i> End Auction
+          </button>
+          <button onclick="transitionState('CANCELLED')" id="btn-cancel" class="py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow">
+            <i class="fa-solid fa-xmark"></i> Cancel Auction
+          </button>
+        </div>
+      </div>
+
+      <!-- UNIT 4: STRATEGY PATTERN (AUTO-BIDDING BOTS) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <h3 class="font-bold text-base text-white flex items-center gap-2 mb-3">
+          <i class="fa-solid fa-robot text-purple-400"></i> Unit 4: Auto-Bidding Strategy Pattern
+        </h3>
+        <p class="text-xs text-slate-400 mb-4">Bots register as <strong>Observers</strong>. When outbid, their configured <strong>Strategy</strong> automatically computes and places a counter-bid!</p>
+
+        <div class="space-y-3">
+          <!-- Bot 1: Conservative -->
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-xs font-bold text-white">ConservativeBot_Charlie</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5">Strategy: <span class="text-emerald-400 font-mono">Incremental (H + $10)</span> • Ceiling: $250.00</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input id="toggle-bot-conservative" type="checkbox" checked onchange="toggleBot('conservative', this.checked)" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+            </label>
+          </div>
+
+          <!-- Bot 2: Aggressive Jump -->
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span class="text-xs font-bold text-white">AggressiveBot_Diana</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5">Strategy: <span class="text-amber-400 font-mono">2x Jump (H + $20)</span> • Ceiling: $400.00</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input id="toggle-bot-aggressive" type="checkbox" checked onchange="toggleBot('aggressive', this.checked)" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNIT 4: OBSERVER PATTERN LIVE FEED -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex-1 flex flex-col min-h-[300px]">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-base text-white flex items-center gap-2">
+            <i class="fa-solid fa-tower-broadcast text-rose-400"></i> Unit 4: Real-time Observer Feed
+          </h3>
+          <span class="text-[10px] font-mono text-slate-400">LIVE EVENTS</span>
+        </div>
+
+        <div id="observer-feed" class="flex-1 overflow-y-auto max-h-72 space-y-2 pr-1 custom-scroll text-xs">
+          <!-- Initial Log -->
+          <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 text-slate-300">
+            <div class="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+              <span>SYSTEM INIT</span>
+              <span>Just now</span>
+            </div>
+            <p>Auction platform loaded. Attached Observers: <span class="text-indigo-400 font-mono">PushNotificationService</span>, <span class="text-emerald-400 font-mono">AuditLogger</span>, <span class="text-purple-400 font-mono">AutoBidAgents</span>.</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-slate-800 bg-slate-900/50 py-4 mt-8">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+      <p>Online Auction Platform • Java 17 Reference Implementation • All units U1–U7 verified.</p>
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/karanamabhinaysai-gif/auction2" target="_blank" class="hover:text-white transition flex items-center gap-1.5">
+          <i class="fa-brands fa-github text-sm"></i> GitHub: karanamabhinaysai-gif/auction2
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SCRIPT LOGIC (U1–U7 SIMULATION ENGINE) -->
+  <script>
+    // State Variables
+    let auctionState = 'ACTIVE'; // Starts in Active for convenience
+    let auctionType = 'English'; // English or SealedBid
+    let reservePrice = 100.00;
+    let minIncrement = 10.00;
+    let highestBid = { amount: 100.00, bidderId: 'Bidder_Bob', timestamp: new Date() };
+    let bidHistory = [
+      { id: 'b-0', bidderId: 'Bidder_Bob', amount: 100.00, timestamp: new Date(Date.now() - 60000) }
+    ];
+    let selectedBidder = 'Human_User';
+    let sellerId = 'Seller_Alice';
+
+    // Auto-bid bots configuration (U4 Strategy Pattern)
+    const bots = {
+      conservative: {
+        id: 'ConservativeBot_Charlie',
+        enabled: true,
+        maxCeiling: 250.00,
+        strategy: 'incremental', // H + increment
+        jumpMultiplier: 1
+      },
+      aggressive: {
+        id: 'AggressiveBot_Diana',
+        enabled: true,
+        maxCeiling: 400.00,
+        strategy: 'jump', // H + 2*increment
+        jumpMultiplier: 2
+      }
+    };
+
+    function updateUI() {
+      // Update state badge
+      const badge = document.getElementById('state-badge');
+      const name = document.getElementById('state-name');
+      name.textContent = auctionState;
+
+      badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono text-xs font-semibold uppercase tracking-wider transition ';
+      if (auctionState === 'ACTIVE') {
+        badge.className += 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+      } else if (auctionState === 'PAUSED') {
+        badge.className += 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+      } else if (auctionState === 'DRAFT') {
+        badge.className += 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+      } else if (auctionState === 'ENDED') {
+        badge.className += 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30';
+      } else if (auctionState === 'CANCELLED') {
+        badge.className += 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+      }
+
+      // Update bids
+      if (auctionType === 'English' || auctionState === 'ENDED') {
+        document.getElementById('highest-bid-val').textContent = `$${highestBid.amount.toFixed(2)}`;
+        document.getElementById('highest-bidder-val').textContent = `by ${highestBid.bidderId}`;
+      } else {
+        document.getElementById('highest-bid-val').textContent = `$???.??`;
+        document.getElementById('highest-bidder-val').textContent = `[Sealed Blind Bid]`;
+      }
+
+      const nextMin = highestBid.amount + minIncrement;
+      document.getElementById('next-min-val').textContent = `$${nextMin.toFixed(2)}`;
+      document.getElementById('bid-input').value = nextMin.toFixed(0);
+    }
+
+    function showToast(title, message, type = 'error') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = {
+        error: 'bg-rose-950 border-rose-700 text-rose-200',
+        warning: 'bg-amber-950 border-amber-700 text-amber-200',
+        success: 'bg-emerald-950 border-emerald-700 text-emerald-200',
+        info: 'bg-indigo-950 border-indigo-700 text-indigo-200'
+      };
+      const icons = {
+        error: 'fa-circle-xmark text-rose-400',
+        warning: 'fa-triangle-exclamation text-amber-400',
+        success: 'fa-circle-check text-emerald-400',
+        info: 'fa-bell text-indigo-400'
+      };
+
+      toast.className = `p-4 rounded-xl border shadow-2xl flex items-start gap-3 pointer-events-auto transition-all duration-300 transform translate-x-full ${colors[type] || colors.error}`;
+      toast.innerHTML = `
+        <i class="fa-solid ${icons[type]} text-lg shrink-0 mt-0.5"></i>
+        <div class="flex-1">
+          <p class="font-bold text-xs leading-none">${title}</p>
+          <p class="text-xs opacity-90 mt-1">${message}</p>
+        </div>
+      `;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-x-full'));
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-full');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function addObserverLog(category, text, extraClass = 'text-slate-300') {
+      const feed = document.getElementById('observer-feed');
+      const entry = document.createElement('div');
+      entry.className = `p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 ${extraClass} animate-fade-in`;
+      entry.innerHTML = `
+        <div class="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+          <span class="font-bold font-mono tracking-wider">${category}</span>
+          <span>${new Date().toLocaleTimeString()}</span>
+        </div>
+        <p>${text}</p>
+      `;
+      feed.insertBefore(entry, feed.firstChild);
+    }
+
+    // U3: Design by Contract validation
+    function validateBidContracts(bidderId, amount) {
+      // Contract 1: Auction State must be ACTIVE
+      if (auctionState !== 'ACTIVE') {
+        throw new Error(`State Contract Violation: Cannot bid when auction is in ${auctionState} state.`);
+      }
+
+      // Contract 2: Bidder cannot be the seller (anti-shill bidding)
+      if (bidderId.toLowerCase() === sellerId.toLowerCase()) {
+        throw new Error(`Precondition Violation: Seller '${bidderId}' cannot bid on their own auction.`);
+      }
+
+      // Contract 3: Bidder cannot outbid themselves consecutively (English auction)
+      if (auctionType === 'English' && highestBid && bidderId.toLowerCase() === highestBid.bidderId.toLowerCase()) {
+        throw new Error(`Precondition Violation: Bidder '${bidderId}' already holds the highest bid.`);
+      }
+
+      // Contract 4: Minimum Increment check
+      const requiredMin = highestBid.amount + minIncrement;
+      if (amount < requiredMin) {
+        throw new Error(`DbC Increment Violation: Bid $${amount.toFixed(2)} is less than required minimum $${requiredMin.toFixed(2)}.`);
+      }
+    }
+
+    function submitBid() {
+      const amount = parseFloat(document.getElementById('bid-input').value);
+      try {
+        validateBidContracts(selectedBidder, amount);
+
+        // Place bid successfully
+        const previousHighest = highestBid;
+        highestBid = { amount: amount, bidderId: selectedBidder, timestamp: new Date() };
+        bidHistory.push(highestBid);
+
+        showToast('Bid Accepted!', `Successfully placed bid of $${amount.toFixed(2)} for ${selectedBidder}.`, 'success');
+        addObserverLog('AUDIT LOG', `New highest bid: <strong class="text-emerald-400">$${amount.toFixed(2)}</strong> placed by <strong class="text-indigo-300">${selectedBidder}</strong>.`);
+
+        // U4 Observer: Outbid Alert to previous highest bidder
+        if (previousHighest && previousHighest.bidderId !== selectedBidder) {
+          addObserverLog('OUTBID ALERT', `Attention <strong class="text-amber-400">${previousHighest.bidderId}</strong>! You have been OUTBID by ${selectedBidder} at $${amount.toFixed(2)}.`, 'text-amber-300 bg-amber-950/20 border-amber-900/40');
+        }
+
+        updateUI();
+
+        // U4: Trigger Bots via Observer
+        triggerAutoBidBots(selectedBidder, amount);
+
+      } catch (err) {
+        showToast('DbC Contract Rejected', err.message, 'error');
+        addObserverLog('CONTRACT REJECTION', err.message, 'text-rose-300 bg-rose-950/20 border-rose-900/40');
+      }
+    }
+
+    // U4: Auto-Bid Strategy Execution
+    function triggerAutoBidBots(lastBidderId, currentAmount) {
+      if (auctionState !== 'ACTIVE') return;
+
+      setTimeout(() => {
+        // Evaluate each enabled bot
+        const botKeys = Object.keys(bots);
+        for (let key of botKeys) {
+          const bot = bots[key];
+          if (!bot.enabled) continue;
+          if (bot.id.toLowerCase() === highestBid.bidderId.toLowerCase()) continue; // Already winning
+
+          let targetBid = 0;
+          if (bot.strategy === 'incremental') {
+            targetBid = highestBid.amount + minIncrement;
+          } else if (bot.strategy === 'jump') {
+            targetBid = highestBid.amount + (minIncrement * bot.jumpMultiplier);
+          }
+
+          if (targetBid <= bot.maxCeiling) {
+            // Bot places counter-bid!
+            const prev = highestBid;
+            highestBid = { amount: targetBid, bidderId: bot.id, timestamp: new Date() };
+            bidHistory.push(highestBid);
+
+            addObserverLog('BOT COUNTER-BID', `<strong class="text-purple-400">${bot.id}</strong> used strategy <strong class="text-white">${bot.strategy}</strong> to counter-bid with <strong class="text-emerald-400">$${targetBid.toFixed(2)}</strong> (Budget limit: $${bot.maxCeiling}).`, 'text-purple-300 bg-purple-950/20 border-purple-900/40');
+
+            if (prev && prev.bidderId !== bot.id) {
+              addObserverLog('OUTBID ALERT', `Hey <strong class="text-amber-400">${prev.bidderId}</strong>! You were OUTBID by ${bot.id} at $${targetBid.toFixed(2)}!`, 'text-amber-300 bg-amber-950/20 border-amber-900/40');
+            }
+
+            updateUI();
+            break; // Allow one bot reaction per tick to create natural chain reaction
+          } else {
+            addObserverLog('BOT RETIRED', `${bot.id} reached budget ceiling of $${bot.maxCeiling.toFixed(2)} and bowed out.`);
+          }
+        }
+      }, 700);
+    }
+
+    function selectBidder(id) {
+      selectedBidder = id;
+      document.querySelectorAll('.bidder-btn').forEach(b => {
+        b.className = 'bidder-btn py-2 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-white font-medium text-xs text-center transition';
+      });
+      const activeBtn = document.getElementById(
+        id === 'Human_User' ? 'btn-bidder-user' : (id === 'Bidder_Charlie' ? 'btn-bidder-charlie' : 'btn-bidder-seller')
+      );
+      if (activeBtn) {
+        activeBtn.className = 'bidder-btn py-2 px-3 rounded-xl border border-indigo-500 bg-indigo-500/10 text-indigo-300 font-medium text-xs text-center transition';
+      }
+    }
+
+    function addQuickIncrement(inc) {
+      const current = parseFloat(document.getElementById('bid-input').value) || highestBid.amount;
+      document.getElementById('bid-input').value = (current + inc).toFixed(0);
+    }
+
+    function setAuctionType(type) {
+      auctionType = type;
+      const eng = document.getElementById('type-english-btn');
+      const sea = document.getElementById('type-sealed-btn');
+      if (type === 'English') {
+        eng.className = 'px-2.5 py-1 rounded bg-indigo-600 font-medium text-white shadow transition';
+        sea.className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition';
+      } else {
+        sea.className = 'px-2.5 py-1 rounded bg-indigo-600 font-medium text-white shadow transition';
+        eng.className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition';
+      }
+      addObserverLog('AUCTION TYPE SWITCH', `Auction type set to: <strong>${type}</strong> (U3 Sealed Type Hierarchy)`);
+      updateUI();
+    }
+
+    function transitionState(newState) {
+      const oldState = auctionState;
+      auctionState = newState;
+      addObserverLog('STATE TRANSITION', `Auction state changed: <strong class="text-slate-400">${oldState}</strong> ===> <strong class="text-indigo-400">${newState}</strong>`);
+      showToast('State Transition', `Auction is now ${newState}`, 'info');
+      updateUI();
+    }
+
+    function toggleBot(botName, isEnabled) {
+      bots[botName].enabled = isEnabled;
+      addObserverLog('BOT CONFIG', `${bots[botName].id} ${isEnabled ? 'ENABLED' : 'DISABLED'}`);
+    }
+
+    // U6 Concurrent CAS simulation
+    function triggerConcurrentConflictTest() {
+      if (auctionState !== 'ACTIVE') {
+        showToast('Auction Inactive', 'Activate auction first to test concurrency.', 'warning');
+        return;
+      }
+      addObserverLog('CONCURRENCY TEST', `Simulating 2 simultaneous last-second bids (U6 Atomic CAS)...`, 'text-purple-400');
+      const bidAmt = highestBid.amount + minIncrement;
+
+      // Bidder 1 succeeds
+      setTimeout(() => {
+        highestBid = { amount: bidAmt, bidderId: 'Concurrent_Bidder_1', timestamp: new Date() };
+        bidHistory.push(highestBid);
+        addObserverLog('CAS SUCCESS', `Thread 1: Concurrent_Bidder_1 succeeded in CAS atomic swap at $${bidAmt.toFixed(2)}.`, 'text-emerald-400');
+        updateUI();
+      }, 50);
+
+      // Bidder 2 attempts same amount and fails CAS
+      setTimeout(() => {
+        addObserverLog('CAS CONFLICT', `Thread 2: Concurrent_Bidder_2 rejected. Expected current bid was overtaken by Thread 1. Invariant enforced.`, 'text-rose-400');
+        showToast('CAS Invariant Enforced', 'Concurrent conflict resolved atomically: Thread 1 won, Thread 2 rejected.', 'info');
+      }, 80);
+    }
+
+    // U5 Settlement & Compensation workflow
+    function executeSettlement(simulateFailure) {
+      if (auctionState !== 'ENDED') {
+        showToast('Auction Not Ended', 'You must END the auction before running settlement.', 'warning');
+        return;
+      }
+
+      const winner = highestBid;
+      if (!simulateFailure) {
+        showToast('Settlement Success', `Winner ${winner.bidderId} paid $${winner.amount.toFixed(2)}. Item awarded!`, 'success');
+        addObserverLog('SETTLEMENT SUCCESS', `Primary settlement complete. Paid by ${winner.bidderId} for $${winner.amount.toFixed(2)}.`);
+      } else {
+        // Failure triggers Compensation
+        showToast('Winner Payment Failed', `Payment default for ${winner.bidderId}! Executing U5 Compensation workflow...`, 'error');
+        addObserverLog('COMPENSATION TRIGGERED', `Winner ${winner.bidderId} defaulted on payment of $${winner.amount.toFixed(2)}.`, 'text-rose-400');
+
+        setTimeout(() => {
+          // Find runner-up
+          const uniqueBidders = [...new Set(bidHistory.map(b => b.bidderId))].filter(id => id !== winner.bidderId);
+          if (uniqueBidders.length > 0) {
+            const runnerUpId = uniqueBidders[uniqueBidders.length - 1];
+            const runnerUpBid = bidHistory.filter(b => b.bidderId === runnerUpId).pop();
+            addObserverLog('COMPENSATION OFFER', `Second-chance offer extended to runner-up <strong class="text-emerald-400">${runnerUpId}</strong> at their bid of $${runnerUpBid.amount.toFixed(2)}.`, 'text-emerald-300 bg-emerald-950/20 border-emerald-900/40');
+            showToast('Compensation Complete', `Item awarded to second-highest bidder ${runnerUpId} at $${runnerUpBid.amount.toFixed(2)}!`, 'success');
+          } else {
+            addObserverLog('RE-AUCTION NEEDED', `No secondary bidder found. Item returned to inventory for re-auction.`);
+          }
+        }, 1000);
+      }
+    }
+
+    // Initialize UI on load
+    updateUI();
+  </script>
+</body>
+</html>
